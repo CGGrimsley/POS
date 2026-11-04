@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pos-token" content="__POS_TOKEN__">
+  <title>Brushbeater POS</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Brushbeater <span>POS</span></div>
+    <div id="catalog-status" class="muted"></div>
+    <nav>
+      <button id="btn-today" class="ghost">Today</button>
+      <button id="btn-refresh" class="ghost" title="Reload products, prices and stock from the website">Refresh products</button>
+      <button id="btn-settings" class="ghost">Settings</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="left">
+      <div class="searchbar">
+        <input id="search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search by name or SKU, or scan a barcode">
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <aside class="cart">
+      <div class="cart-head">
+        <h2>Sold</h2>
+        <button id="btn-clear" class="ghost small">Clear</button>
+      </div>
+      <div id="cart-lines" class="cart-lines"></div>
+      <div class="totals">
+        <div><span>Subtotal</span><span id="t-sub">$0.00</span></div>
+        <div><span id="t-tax-label">Sales tax</span><span id="t-tax">$0.00</span></div>
+        <div class="grand"><span>Total</span><span id="t-total">$0.00</span></div>
+        <p class="muted small">Prices are the website prices. Charge the customer in Authorize.net as usual.</p>
+      </div>
+      <button id="btn-sell" class="primary big" disabled>Take off website stock</button>
+    </aside>
+  </main>
+
+  <dialog id="dlg-confirm">
+    <h2>Take these off website stock?</h2>
+    <div id="confirm-body"></div>
+    <div id="confirm-error" class="error" hidden></div>
+    <div class="row-end">
+      <button id="confirm-no" class="ghost">Go back</button>
+      <button id="confirm-yes" class="primary">Yes, update stock</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-today" class="wide">
+    <h2>Today on this laptop</h2>
+    <div id="today-body"></div>
+    <div class="row-end"><button class="ghost" data-close>Close</button></div>
+  </dialog>
+
+  <dialog id="dlg-settings" class="wide">
+    <h2>Settings</h2>
+    <form id="settings-form">
+      <fieldset>
+        <legend>Website connection</legend>
+        <label>Store address <input name="storeUrl" required></label>
+        <label>WooCommerce consumer key <input name="consumerKey" autocomplete="off" placeholder="ck_..."></label>
+        <label>WooCommerce consumer secret <input name="consumerSecret" type="password" autocomplete="off" placeholder="cs_..."></label>
+        <p class="muted small">Make the key in WordPress under WooCommerce, Settings, Advanced, REST API, with Read/Write access. It is stored encrypted on this laptop only. Leave these blank to keep the saved key.</p>
+      </fieldset>
+      <fieldset>
+        <legend>This laptop</legend>
+        <label>Laptop name (shown in the Today list) <input name="register" required></label>
+        <label>Sales tax rate for the on-screen total, as a decimal <input name="taxRate" inputmode="decimal"></label>
+        <p class="muted small">Yanceyville is 0.0675 (4.75% NC plus 2% Caswell County). Use 0 to hide tax.</p>
+      </fieldset>
+      <div id="settings-msg" class="error" hidden></div>
+      <div class="row-end">
+        <button type="button" class="ghost" data-close>Close</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{
+  "name": "brushbeater-pos",
+  "productName": "Brushbeater POS",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Counter app for the Brushbeater showroom: look up products and prices, and take sold items off brushbeater.store stock.",
+  "author": "Brushbeater",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node server.js",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "build": {
+    "appId": "store.brushbeater.pos",
+    "productName": "Brushbeater POS",
+    "files": [
+      "electron/**",
+      "lib/**",
+      "public/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Brushbeater-POS-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Brushbeater POS",
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "devDependencies": {
+    "electron": "44.9.2",
+    "electron-builder": "26.18.0"
+  }
+}
