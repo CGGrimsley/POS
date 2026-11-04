@@ -1,0 +1,13 @@
+# Credentials and local settings. Never commit these.
+config.local.json
+*.local.json
+.env
+.env.*
+
+# Local data written by the app (sale log, cached catalog)
+data/
+
+node_modules/
+.DS_Store
+Thumbs.db
+dist/
