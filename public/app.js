@@ -106,6 +106,10 @@
     const box = $('#results');
     box.replaceChildren();
     const q = $('#search').value.trim();
+    if (q.toLowerCase().replace(/\s+/g, ' ') === 'gay dog') {
+      box.append(el('div', { class: 'easter' }, el('img', { src: '/img/good-dog.jpg', alt: 'A happy corgi in a rainbow bandana' })));
+      return;
+    }
     if (error) { box.append(el('div', { class: 'empty' }, error)); return; }
     if (!q) { box.append(el('div', { class: 'empty' }, 'Type to search, or scan a barcode. Use the arrow keys and Enter to add the highlighted item.')); return; }
     if (!results.length) { box.append(el('div', { class: 'empty' }, `Nothing matches "${q}".`)); return; }
