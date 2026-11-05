@@ -1,0 +1,98 @@
+:root {
+  --bg: #141412;
+  --panel: #1d1d1a;
+  --panel-2: #262622;
+  --line: #34342e;
+  --text: #ecebe4;
+  --muted: #9d9b90;
+  --accent: #c9a227;
+  --accent-text: #141412;
+  --ok: #6fb26a;
+  --warn: #d9a441;
+  --bad: #e06c5a;
+  --radius: 8px;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+body { display: flex; flex-direction: column; font-size: 15px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel-2); padding: 8px 14px; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; }
+button.small { padding: 4px 10px; font-size: 13px; }
+button.big { width: 100%; padding: 14px; font-size: 18px; }
+input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; width: 100%; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.error { color: var(--bad); margin: 10px 0; white-space: pre-line; }
+
+.topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.brand { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.brand span { color: var(--accent); }
+.topbar nav { margin-left: auto; display: flex; gap: 8px; }
+#catalog-status { font-size: 13px; }
+
+.layout { flex: 1; display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
+.left { display: flex; flex-direction: column; min-height: 0; padding: 16px; gap: 12px; }
+.searchbar input { font-size: 20px; padding: 12px 14px; }
+.results { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; align-content: start; }
+.result { display: grid; grid-template-columns: 56px 1fr; gap: 10px; text-align: left; padding: 10px; background: var(--panel); border: 1px solid var(--line); }
+.result:hover, .result.active { border-color: var(--accent); }
+.result img, .result .noimg { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: var(--panel-2); }
+.result .name { font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.result .meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 13px; }
+.stock-ok { color: var(--ok); }
+.stock-low { color: var(--warn); }
+.stock-out { color: var(--bad); }
+.empty { color: var(--muted); padding: 30px 6px; grid-column: 1 / -1; }
+
+.cart { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); padding: 16px; gap: 12px; }
+.cart-head { display: flex; justify-content: space-between; align-items: center; }
+.cart-head h2 { margin: 0; font-size: 18px; }
+.cart-lines { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.line { background: var(--panel-2); border-radius: var(--radius); padding: 10px; display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; }
+.line .lname { font-weight: 600; line-height: 1.25; }
+.line .lsku { font-size: 12px; color: var(--muted); }
+.line .ltotal { font-weight: 600; text-align: right; }
+.line .controls { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }
+.line .controls input { width: 90px; padding: 4px 8px; }
+.line .controls .qty { width: 60px; text-align: center; }
+.line .controls .rm { margin-left: auto; }
+.line .warn { grid-column: 1 / -1; color: var(--warn); font-size: 13px; }
+.customer summary { cursor: pointer; color: var(--muted); }
+.customer label { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); }
+.totals { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
+.totals div { display: flex; justify-content: space-between; }
+.totals .grand { font-size: 22px; font-weight: 700; margin-top: 4px; }
+
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 22px; width: min(520px, 94vw); }
+dialog.wide { width: min(760px, 96vw); }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog h2 { margin-top: 0; }
+.row-end { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 12px; padding: 10px 14px; }
+legend { color: var(--accent); padding: 0 6px; }
+fieldset label { display: block; margin: 8px 0; font-size: 13px; color: var(--muted); }
+fieldset label input, fieldset label select, fieldset label textarea { margin-top: 4px; color: var(--text); }
+
+.pay-methods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.pay-methods button.sel { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.sumtable { width: 100%; border-collapse: collapse; }
+.sumtable td { padding: 3px 0; }
+.sumtable td:last-child { text-align: right; }
+.sumtable tr.grand td { font-size: 20px; font-weight: 700; border-top: 1px solid var(--line); padding-top: 6px; }
+.change { font-size: 20px; margin-top: 8px; }
+table.list { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.list th, table.list td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); }
+table.list td.num, table.list th.num { text-align: right; }
+
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: var(--radius); max-width: 80vw; }
+.toast.bad { border-color: var(--bad); }
+
+tr.undone td { color: var(--muted); text-decoration: line-through; }
+tr.undone td:last-child { text-decoration: none; }
+.totals p { margin: 6px 0 0; }
