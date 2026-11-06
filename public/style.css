@@ -96,3 +96,5 @@ table.list td.num, table.list th.num { text-align: right; }
 tr.undone td { color: var(--muted); text-decoration: line-through; }
 tr.undone td:last-child { text-decoration: none; }
 .totals p { margin: 6px 0 0; }
+.easter { grid-column: 1 / -1; display: flex; justify-content: center; padding: 10px; }
+.easter img { max-width: 100%; max-height: 70vh; border-radius: 12px; }
