@@ -111,3 +111,14 @@ label.check { display: flex; align-items: center; gap: 8px; color: var(--text); 
 label.check input { width: auto; margin: 0; }
 [hidden] { display: none !important; }
 .result .meta { gap: 8px; }
+.photos { margin: 8px 0; }
+.photos .lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.photo-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.photo-list .ph { position: relative; width: 84px; height: 84px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.photo-list .ph:first-child { border-color: var(--accent); }
+.photo-list img { width: 100%; height: 100%; object-fit: cover; }
+.photo-list .ph button { position: absolute; top: 2px; right: 2px; padding: 0 6px; font-size: 13px; line-height: 20px; background: rgba(0,0,0,.7); }
+.photo-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.photo-actions input[type=url] { flex: 1; }
+.filebtn { display: inline-block; cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); padding: 8px 14px; color: var(--text); font-size: 14px; white-space: nowrap; margin: 0; }
+.filebtn:focus-within { outline: 2px solid var(--accent); }

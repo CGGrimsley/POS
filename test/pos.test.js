@@ -242,3 +242,42 @@ test('new product: created as draft with stock, added to search, duplicate SKU r
   await assert.rejects(ps.create({ name: 'Other', price: 1, sku: 'pr-bs' }), /already uses SKU/);
   await assert.rejects(ps.create({ name: 'Ok name', price: -1 }), /price/);
 });
+
+test('photos: uploaded to the media library with the WordPress login, then attached', async () => {
+  const { MediaClient } = require('../lib/media');
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push({ url: String(url), opts });
+    if (String(url).endsWith('/media')) return new Response(JSON.stringify({ id: 900 + calls.length, source_url: 'https://x/img.jpg' }), { status: 201 });
+    return new Response('{}', { status: 200 });
+  };
+  const media = new MediaClient({ storeUrl: 'https://example.test', wpUser: 'chris', wpAppPassword: 'abcd efgh ijkl', fetchImpl });
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const ps = new ProductService(w, c, media);
+  const jpeg = 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64');
+  await ps.create({ name: 'Peak Refuel Chicken Pesto', price: 14, qty: 3, images: [{ data: jpeg }], imageUrls: ['https://cdn.example/p.jpg'] });
+  const up = calls[0];
+  assert.match(up.url, /\/wp-json\/wp\/v2\/media$/);
+  assert.equal(up.opts.headers['Content-Type'], 'image/jpeg');
+  assert.match(up.opts.headers['Content-Disposition'], /peak-refuel-chicken-pesto-1\.jpg/);
+  assert.equal(up.opts.headers.Authorization, 'Basic ' + Buffer.from('chris:abcdefghijkl').toString('base64'));
+  const sent = w.writes.at(-1)[1];
+  assert.deepEqual(sent.images, [{ id: 901 }, { src: 'https://cdn.example/p.jpg', alt: 'Peak Refuel Chicken Pesto' }]);
+
+  // Not an image -> refused before anything is created
+  const before = w.writes.length;
+  await assert.rejects(ps.create({ name: 'Bad photo', price: 1, images: [{ data: 'data:image/jpeg;base64,' + Buffer.from('hello').toString('base64') }] }), /not a JPEG/);
+  assert.equal(w.writes.length, before);
+});
+
+test('photos: file uploads without a WordPress login are refused with a clear message', async () => {
+  const { MediaClient } = require('../lib/media');
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const ps = new ProductService(w, c, new MediaClient({ storeUrl: 'https://example.test' }));
+  await assert.rejects(ps.create({ name: 'Needs login', price: 1, images: [{ data: 'x' }] }), /Application Password/);
+  await assert.rejects(ps.create({ name: 'Bad link', price: 1, imageUrls: ['http://insecure/x.jpg'] }), /https/);
+});

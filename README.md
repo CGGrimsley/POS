@@ -34,7 +34,9 @@ Every change shows in **Today** with an **Undo** button.
 
 ### New products
 
-**New product** (top bar) creates a simple product on the website with a name, price, quantity, optional SKU or barcode, category and short description. It is saved as a draft unless you tick "Show it on the website now". Drafts are hidden online but can be sold in the app right away. Add photos and the full description in WordPress before publishing. If a search or barcode scan finds nothing, the results area offers **Add a new product** with the scanned code filled in.
+**New product** (top bar) creates a simple product on the website with a name, price, quantity, optional SKU or barcode, category and short description. It is saved as a draft unless you tick "Show it on the website now". Drafts are hidden online but can be sold in the app right away.
+
+Photos: click **Add photos**, drag pictures onto the form, or paste one from the clipboard (up to 6; the first is the main photo). The app shrinks them to 1600px and uploads them to the WordPress media library with the product name as alt text. Uploading needs a WordPress username and **Application Password** in Settings (WordPress: Users → Profile → Application Passwords → Add). WooCommerce API keys can't upload files. A pasted https photo link works without it. If a search or barcode scan finds nothing, the results area offers **Add a new product** with the scanned code filled in.
 
 ## Making a new version
 
@@ -57,6 +59,7 @@ How it fits together:
 - `lib/catalog.js` keeps a local copy of products and variations for instant search.
 - `lib/stock.js` changes stock counts (sold, received, set count, and undo). Variations that share their parent's stock are combined into one update.
 - `lib/products.js` creates new products and lists categories.
+- `lib/media.js` uploads product photos to the WordPress media library (Application Password auth).
 - `lib/app.js` is the local server for the screen. It only listens on 127.0.0.1 and every request needs a token created at launch, so other web pages can't use it.
 - `lib/settings.js` stores settings, encrypting the API key with Windows' own key storage.
 - `electron/main.js` is the Windows app window.

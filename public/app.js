@@ -334,9 +334,50 @@
 
   // ---------- new product ----------
   let categoriesLoaded = false;
+  let photos = []; // [{ data: 'data:image/jpeg;base64,...' }]
+
+  // Shrink a photo to at most 1600px on the long side before sending it.
+  function shrinkPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const max = 1600;
+        const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * scale);
+        c.height = Math.round(img.naturalHeight * scale);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.86));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Couldn't read ${file.name}`)); };
+      img.src = url;
+    });
+  }
+
+  function renderPhotos() {
+    $('#photo-list').replaceChildren(...photos.map((p, i) => el('div', { class: 'ph' },
+      el('img', { src: p.data, alt: i === 0 ? 'Main photo' : `Photo ${i + 1}` }),
+      el('button', { type: 'button', 'aria-label': 'Remove photo', onclick: () => { photos.splice(i, 1); renderPhotos(); } }, '×'))));
+    $('#photo-hint').hidden = !(photos.length && status && status.settings && !status.settings.wpAppPasswordSet);
+  }
+
+  async function addPhotos(files) {
+    for (const f of files) {
+      if (photos.length >= 6) { toast('Up to 6 photos per product.', true); break; }
+      try { photos.push({ data: await shrinkPhoto(f) }); } catch (e) { toast(e.message, true); }
+    }
+    renderPhotos();
+  }
   async function openNewProduct(prefillSku) {
     const f = $('#product-form');
     f.reset();
+    photos = [];
+    renderPhotos();
     $('#product-msg').hidden = true;
     if (prefillSku) f.sku.value = prefillSku;
     $('#dlg-product').showModal();
@@ -360,12 +401,15 @@
     msg.hidden = true;
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true;
+    btn.textContent = photos.length ? 'Uploading photos...' : 'Adding...';
     try {
       const out = await api('POST', '/api/products', {
         name: f.name.value, price: f.price.value, sku: f.sku.value, qty: f.qty.value || 0,
         categoryIds: f.category.value ? [Number(f.category.value)] : [],
         description: f.description.value,
         status: f.publish.checked ? 'publish' : 'draft',
+        images: photos,
+        imageUrls: f.imageUrl.value.trim() ? [f.imageUrl.value.trim()] : [],
       });
       $('#dlg-product').close();
       toast(`${out.item.name} added to the website${out.item.status === 'publish' ? '' : ' as a draft'}.`);
@@ -377,6 +421,7 @@
       msg.hidden = false;
     } finally {
       btn.disabled = false;
+      btn.textContent = 'Add product';
     }
   }
 
@@ -393,6 +438,9 @@
     f.consumerSecret.placeholder = s.consumerSecretSet ? 'Saved (leave blank to keep)' : 'cs_...';
     f.register.value = s.register || '';
     f.taxRate.value = s.taxRate ?? 0.0675;
+    f.wpUser.value = s.wpUser || '';
+    f.wpAppPassword.value = '';
+    f.wpAppPassword.placeholder = s.wpAppPasswordSet ? 'Saved (leave blank to keep)' : 'xxxx xxxx xxxx xxxx xxxx xxxx';
     $('#settings-msg').hidden = true;
     dlg.showModal();
   }
@@ -409,6 +457,8 @@
     };
     if (f.consumerKey.value.trim()) body.consumerKey = f.consumerKey.value.trim();
     if (f.consumerSecret.value.trim()) body.consumerSecret = f.consumerSecret.value.trim();
+    body.wpUser = f.wpUser.value.trim();
+    if (f.wpAppPassword.value.trim()) body.wpAppPassword = f.wpAppPassword.value.trim();
     try {
       const out = await api('POST', '/api/settings', body);
       if (!out.ok) { msg.textContent = out.problems.join('\n'); msg.hidden = false; await refreshStatus(); return; }
@@ -449,6 +499,17 @@
   document.querySelectorAll('#modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('#btn-new').addEventListener('click', () => openNewProduct(''));
   $('#product-form').addEventListener('submit', saveProduct);
+  $('#photo-input').addEventListener('change', (e) => { addPhotos([...e.target.files]); e.target.value = ''; });
+  // Photos can also be dragged onto the form, or pasted from the clipboard.
+  $('#dlg-product').addEventListener('dragover', (e) => e.preventDefault());
+  $('#dlg-product').addEventListener('drop', (e) => {
+    e.preventDefault();
+    addPhotos([...e.dataTransfer.files].filter((f) => /^image\//.test(f.type)));
+  });
+  $('#dlg-product').addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData ? e.clipboardData.files : [])].filter((f) => /^image\//.test(f.type));
+    if (files.length) { e.preventDefault(); addPhotos(files); }
+  });
   $('#confirm-no').addEventListener('click', () => $('#dlg-confirm').close());
   $('#dlg-confirm').addEventListener('close', () => search.focus());
   $('#btn-clear').addEventListener('click', () => { if (cart.length && confirm('Clear the list?')) { cart = []; saveCart(); renderCart(); } });
