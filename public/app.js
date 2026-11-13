@@ -326,7 +326,7 @@
     const date = $('#day-pick').value || localDateStr();
     try {
       const d = await api('GET', '/api/sales/day?date=' + encodeURIComponent(date));
-      const rows = [['Date', 'Time', 'Laptop', 'Action', 'Product', 'SKU', 'Qty', 'Unit price', 'Line total', 'Est. sales tax', 'Stock before', 'Stock after', 'Undone']];
+      const rows = [['Date', 'Time', 'Laptop', 'Action', 'Product', 'SKU', 'Qty', 'Unit price', 'Line total', 'Est. sales tax', 'Stock before', 'Stock after', 'Undone or status']];
       let sold = 0;
       for (const e of [...d.entries].reverse()) {
         const kind = e.type === 'new' ? 'New product' : ENTRY_LABEL[e.mode || 'sold'];
@@ -339,8 +339,20 @@
           rows.push([d.date, time, e.register || d.register, kind, l.name, l.sku, l.qty, l.price ?? '', total, tax, l.before ?? '', l.after ?? '', e.undone ? 'yes' : '']);
         }
       }
+      const web = await api('GET', '/api/orders/day?date=' + encodeURIComponent(date)).catch((e) => ({ orders: [], error: e.message }));
+      let online = 0;
+      for (const o of web.orders || []) {
+        const time = new Date(o.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        for (const l of o.lines) {
+          if (o.counted) online += l.total;
+          rows.push([d.date, time, 'Website', `Online order #${o.number}`, l.name, l.sku, l.qty, l.qty ? round2(l.total / l.qty) : '', round2(l.total), '', '', '', o.counted ? '' : o.status]);
+        }
+      }
       rows.push([]);
-      rows.push(['', '', '', 'Total sold (not undone)', '', '', '', '', round2(sold), round2(sold * d.taxRate)]);
+      rows.push(['', '', '', 'Total sold in store (not undone)', '', '', '', '', round2(sold), round2(sold * d.taxRate)]);
+      if (web.error) rows.push(['', '', '', 'Website orders not included: ' + web.error]);
+      else rows.push(['', '', '', 'Total sold on website (before tax and shipping)', '', '', '', '', round2(online)]);
+      rows.push(['', '', '', 'Total sold overall', '', '', '', '', round2(sold + online)]);
       downloadCsv(`pos-${(d.register || 'laptop').replace(/[^A-Za-z0-9]+/g, '-')}-${d.date}.csv`, rows);
     } catch (e) {
       toast(e.message, true);
@@ -353,7 +365,7 @@
     if (!$('#day-pick').value) $('#day-pick').value = localDateStr();
     const date = $('#day-pick').value;
     const isToday = date === localDateStr();
-    $('#today-title').textContent = isToday ? 'Today on this laptop' : `${new Date(date + 'T12:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })} on this laptop`;
+    $('#today-title').textContent = isToday ? 'Today' : new Date(date + 'T12:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
     body.replaceChildren(el('p', { class: 'muted' }, 'Loading...'));
     if (!dlg.open) dlg.showModal();
     try {
@@ -375,23 +387,86 @@
       if ((st.waiting || []).length) {
         pending.push(el('button', { class: 'small', onclick: async () => { toast('Trying to send...'); const r = await api('POST', '/api/queue/retry'); toast(r.waiting ? 'Still offline.' : 'All sent.', Boolean(r.waiting)); openToday(); refreshStatus(); } }, 'Try sending now'));
       }
-      const { entries: sales } = await api('GET', '/api/sales/day?date=' + encodeURIComponent(date));
-      if (!sales.length) { body.replaceChildren(...pending, el('p', { class: 'muted' }, `Nothing recorded on this laptop ${isToday ? 'today' : 'that day'}.`)); return; }
+      const [{ entries: sales }, web] = await Promise.all([
+        api('GET', '/api/sales/day?date=' + encodeURIComponent(date)),
+        api('GET', '/api/orders/day?date=' + encodeURIComponent(date)).catch((e) => ({ orders: [], stock: {}, error: e.message })),
+      ]);
+      if (date !== $('#day-pick').value) return; // a newer date was picked meanwhile
+      const when = isToday ? 'today' : 'that day';
+      const time = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+      // In store (this laptop)
       const live = sales.filter((s) => !s.undone && s.type !== 'new' && (s.mode || 'sold') === 'sold');
-      const units = live.reduce((n, s) => n + s.lines.reduce((m, l) => m + l.qty, 0), 0);
-      const soldTotal = round2(live.reduce((n, s) => n + s.lines.reduce((m, l) => m + (l.price || 0) * l.qty, 0), 0));
-      body.replaceChildren(
-        ...pending,
-        el('p', {}, `${live.length} sale(s), ${units} item(s), ${fmt(soldTotal)} before tax, taken off website stock ${isToday ? 'today' : 'that day'}.`),
-        el('table', { class: 'list' },
+      const storeUnits = live.reduce((n, s) => n + s.lines.reduce((m, l) => m + l.qty, 0), 0);
+      const storeTotal = round2(live.reduce((n, s) => n + s.lines.reduce((m, l) => m + (l.price || 0) * l.qty, 0), 0));
+
+      // Website orders
+      const orders = web.orders || [];
+      const paid = orders.filter((o) => o.counted);
+      const webUnits = paid.reduce((n, o) => n + o.lines.reduce((m, l) => m + l.qty, 0), 0);
+      const webItems = round2(paid.reduce((n, o) => n + o.lines.reduce((m, l) => m + l.total, 0), 0));
+      const webGross = round2(paid.reduce((n, o) => n + o.total, 0));
+
+      // Items sold, both places together
+      const byItem = new Map();
+      const now = { ...(web.stock || {}) };
+      const bump = (key, name, field, qty) => {
+        const r = byItem.get(key) || { name, store: 0, web: 0 };
+        r[field] += qty;
+        byItem.set(key, r);
+      };
+      for (const s of [...live].reverse()) for (const l of s.lines) { bump(l.key, l.name, 'store', l.qty); if (l.after !== undefined && now[l.key] === undefined) now[l.key] = l.after; }
+      for (const o of paid) for (const l of o.lines) bump(l.key, l.name, 'web', l.qty);
+      const itemRows = [...byItem.entries()].sort((a, b) => (b[1].store + b[1].web) - (a[1].store + a[1].web) || a[1].name.localeCompare(b[1].name));
+
+      const parts = [...pending];
+      parts.push(el('div', { class: 'day-sum' },
+        el('div', {}, el('span', { class: 'muted' }, 'Overall'), el('strong', {}, `${storeUnits + webUnits} item(s)`), el('strong', {}, fmt(round2(storeTotal + webItems)))),
+        el('div', {}, el('span', { class: 'muted' }, 'In store'), el('span', {}, `${storeUnits} item(s), ${live.length} sale(s)`), el('span', {}, fmt(storeTotal))),
+        el('div', {}, el('span', { class: 'muted' }, 'Website'), el('span', {}, web.error ? 'not loaded' : `${webUnits} item(s), ${paid.length} order(s)`), el('span', {}, web.error ? '' : fmt(webItems)))));
+      parts.push(el('p', { class: 'muted small' }, `Amounts are product prices before sales tax${paid.length ? `. Website orders came to ${fmt(webGross)} with shipping and tax` : ''}. "In store" is this laptop only.`));
+      if (web.error) parts.push(el('p', { class: 'warnc small' }, web.error));
+
+      if (itemRows.length) {
+        parts.push(el('h3', {}, 'Items sold'));
+        parts.push(el('table', { class: 'list' },
+          el('tr', {}, el('th', {}, 'Product'), el('th', { class: 'num' }, 'In store'), el('th', { class: 'num' }, 'Website'), el('th', { class: 'num' }, 'Total'), el('th', { class: 'num' }, 'In stock now')),
+          itemRows.map(([key, r]) => el('tr', {},
+            el('td', {}, r.name),
+            el('td', { class: 'num' }, r.store || ''),
+            el('td', { class: 'num' }, r.web || ''),
+            el('td', { class: 'num' }, r.store + r.web),
+            el('td', { class: 'num' }, now[key] ?? '')))));
+      }
+
+      parts.push(el('h3', {}, 'In store on this laptop'));
+      if (!sales.length) parts.push(el('p', { class: 'muted' }, `Nothing recorded on this laptop ${when}.`));
+      else {
+        parts.push(el('table', { class: 'list' },
           el('tr', {}, el('th', {}, 'Time'), el('th', {}, 'What'), el('th', {}, 'Items'), el('th', {}, '')),
           sales.map((s) => el('tr', { class: s.undone ? 'undone' : '' },
-            el('td', {}, new Date(s.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })),
+            el('td', {}, time(s.at)),
             el('td', {}, ENTRY_LABEL[s.type === 'new' ? 'new' : (s.mode || 'sold')]),
             el('td', {}, entryText(s)),
             el('td', {}, s.type === 'new' || !isToday ? (s.undone ? el('span', { class: 'muted' }, 'Undone') : null) : s.undone ? el('span', { class: 'muted' }, 'Undone')
-              : el('button', { class: 'small ghost', onclick: () => undo(s) }, 'Undo'))))),
-        el('p', { class: 'muted small' }, 'Undo reverses a stock change, for a return or a mistake. To remove a new product, delete it in WordPress.'));
+              : el('button', { class: 'small ghost', onclick: () => undo(s) }, 'Undo'))))));
+        parts.push(el('p', { class: 'muted small' }, 'Undo reverses a stock change, for a return or a mistake. To remove a new product, delete it in WordPress.'));
+      }
+
+      if (!web.error) {
+        parts.push(el('h3', {}, 'Website orders'));
+        if (!orders.length) parts.push(el('p', { class: 'muted' }, `No website orders ${when}.`));
+        else {
+          parts.push(el('table', { class: 'list' },
+            el('tr', {}, el('th', {}, 'Time'), el('th', {}, 'Order'), el('th', {}, 'Items'), el('th', { class: 'num' }, 'Total')),
+            [...orders].reverse().map((o) => el('tr', { class: o.counted ? '' : 'undone' },
+              el('td', {}, time(o.at)),
+              el('td', {}, `#${o.number}`, o.counted ? null : el('span', { class: 'muted small' }, ` ${o.status}`)),
+              el('td', {}, o.lines.map((l) => `${l.qty} x ${l.name}`).join(', ')),
+              el('td', { class: 'num' }, fmt(o.total))))));
+        }
+      }
+      body.replaceChildren(...parts);
     } catch (e) {
       body.replaceChildren(el('p', { class: 'error' }, e.message));
     }

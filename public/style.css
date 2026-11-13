@@ -149,3 +149,8 @@ label.inline input[type=number] { width: 70px; padding: 5px 8px; }
   body.printing-low .no-print { display: none !important; }
   body.printing-low table.list th, body.printing-low table.list td { border-bottom: 1px solid #999; color: #000; }
 }
+.day-sum { display: grid; gap: 4px; background: var(--panel-2); border-radius: var(--radius); padding: 10px 12px; }
+.day-sum div { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; }
+.day-sum div:first-child { font-size: 18px; }
+#today-body h3 { margin: 18px 0 6px; font-size: 15px; color: var(--accent); }
+#today-body { max-height: 65vh; overflow-y: auto; }

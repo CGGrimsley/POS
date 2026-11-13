@@ -380,3 +380,29 @@ test('sales log: any day can be read back, with new products and undo marks', ()
   assert.equal(log.day('2001-01-01').length, 0);
   assert.equal(log.day('nonsense').length, 0);
 });
+
+test('website orders: one local day is asked for in UTC, refunds listed but not counted', async () => {
+  const { ordersForDay, dayRange } = require('../lib/orders');
+  const r = dayRange('2026-11-13');
+  assert.equal(new Date(r.after + 'Z').getTime(), new Date(2026, 10, 13).getTime());
+  assert.equal(new Date(r.before + 'Z').getTime(), new Date(2026, 10, 14).getTime());
+  let asked;
+  const woo = {
+    async getAll(p, q) {
+      asked = [p, q];
+      return [
+        { id: 7, number: '7', status: 'processing', date_created_gmt: '2026-11-13T15:00:00', total: '27.68', total_tax: '1.69', shipping_total: '0', line_items: [{ product_id: 2, variation_id: 22, name: 'Cowboy Tee - L', sku: 'TEE-L', quantity: 1, total: '25.00' }] },
+        { id: 8, number: '8', status: 'refunded', date_created_gmt: '2026-11-13T16:00:00', total: '2.14', line_items: [{ product_id: 1, variation_id: 0, name: 'Radio Contra Decal', quantity: 1, total: '2.00' }] },
+      ];
+    },
+  };
+  const orders = await ordersForDay(woo, '2026-11-13');
+  assert.equal(asked[0], '/orders');
+  assert.equal(asked[1].dates_are_gmt, 'true');
+  assert.match(asked[1].status, /processing/);
+  assert.equal(orders[0].lines[0].key, '2:22'); // same key as the product list, so counts line up
+  assert.equal(orders[0].counted, true);
+  assert.equal(orders[1].counted, false);
+  assert.equal(orders[1].lines[0].key, '1');
+  assert.throws(() => dayRange('nope'), /Pick a date/);
+});

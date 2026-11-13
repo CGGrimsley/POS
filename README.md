@@ -42,7 +42,7 @@ Each search result has a **Price** button. It changes the regular price and the 
 
 ### End of day
 
-**Today** has a date picker to look back at any earlier day on this laptop, and **Export CSV** saves that day's changes with prices, estimated sales tax, stock before and after, and a total of what was sold. Undo is only offered for today.
+**Today** puts the showroom and the website side by side for a day. The top line shows items sold and dollars (before tax) in store, on the website, and overall. **Items sold** combines both, per product, with the count in stock now. Below that are this laptop's changes and the day's website orders (processing, completed and on hold count as sales; refunded orders are shown crossed out). The date picker looks back at any earlier day, and **Export CSV** saves the in-store lines and the website order lines with totals for each and overall. Undo is only offered for today. Reading orders uses the same Read/Write API key.
 
 ### When the internet drops
 
