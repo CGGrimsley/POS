@@ -122,3 +122,30 @@ label.check input { width: auto; margin: 0; }
 .photo-actions input[type=url] { flex: 1; }
 .filebtn { display: inline-block; cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); padding: 8px 14px; color: var(--text); font-size: 14px; white-space: nowrap; margin: 0; }
 .filebtn:focus-within { outline: 2px solid var(--accent); }
+.result-wrap { position: relative; display: grid; }
+.result-wrap .edit-price { position: absolute; top: 6px; right: 6px; padding: 2px 8px; font-size: 12px; opacity: .75; background: var(--panel); }
+.result-wrap .edit-price:hover, .result-wrap .edit-price:focus-visible { opacity: 1; border-color: var(--accent); }
+.result-wrap .result .name { padding-right: 46px; }
+.linkish { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 13px; }
+.warnc { color: var(--warn); }
+.badc { color: var(--bad); }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.dlg-head h2 { margin: 0; }
+.dlg-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dlg-tools input[type=date], .dlg-tools select { width: auto; padding: 5px 8px; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin: 0; }
+label.inline input[type=number] { width: 70px; padding: 5px 8px; }
+.low-body { max-height: 60vh; overflow-y: auto; }
+.pending { background: var(--panel-2); border-left: 3px solid var(--warn); padding: 8px 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; }
+.pending.bad { border-left-color: var(--bad); }
+.row-between { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+#dlg-price { width: min(460px, 94vw); }
+@media print {
+  body.printing-low { background: #fff; color: #000; }
+  body.printing-low > *:not(#dlg-low) { display: none !important; }
+  body.printing-low #dlg-low { position: static; display: block !important; border: 0; width: 100%; max-width: none; background: #fff; color: #000; padding: 0; }
+  body.printing-low #dlg-low::backdrop { display: none; }
+  body.printing-low .low-body { max-height: none; overflow: visible; }
+  body.printing-low .no-print { display: none !important; }
+  body.printing-low table.list th, body.printing-low table.list td { border-bottom: 1px solid #999; color: #000; }
+}

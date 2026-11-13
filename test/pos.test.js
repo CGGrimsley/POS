@@ -281,3 +281,102 @@ test('photos: file uploads without a WordPress login are refused with a clear me
   await assert.rejects(ps.create({ name: 'Needs login', price: 1, images: [{ data: 'x' }] }), /Application Password/);
   await assert.rejects(ps.create({ name: 'Bad link', price: 1, imageUrls: ['http://insecure/x.jpg'] }), /https/);
 });
+
+test('offline: changes that cannot reach the store wait on disk and go out in order', async () => {
+  const { OfflineQueue } = require('../lib/queue');
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const s = new StockService(w, c);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pos-'));
+  const file = path.join(dir, 'q.json');
+  const realGet = w.get;
+  w.get = async () => { throw Object.assign(new Error('offline'), { network: true }); };
+  const r = await s.apply([{ key: '1', qty: 2 }], 'sold');
+  assert.equal(r.failed[0].network, true);
+  const q = new OfflineQueue(file);
+  q.add('sold', [{ key: '1', qty: 2 }], 'Front');
+  q.add('received', [{ key: '1', qty: 5 }], 'Front');
+  c.adjustLocal('1', 'sold', 2);
+  assert.equal(c.get('1').stockQty, 8);
+  // Still offline: nothing is sent, nothing is lost, and it survives a restart.
+  assert.equal(await q.flush(s, () => {}), 0);
+  assert.equal(new OfflineQueue(file).count, 2);
+  // Back online: both go out, in the order they were made.
+  w.get = realGet;
+  const sent = [];
+  assert.equal(await new OfflineQueue(file).flush(s, (e) => sent.push(e.mode)), 2);
+  assert.deepEqual(sent, ['sold', 'received']);
+  assert.equal(w.products[1].stock_quantity, 13);
+  assert.equal(new OfflineQueue(file).count, 0);
+});
+
+test('offline: a change the store refuses is set aside, not retried forever', async () => {
+  const { OfflineQueue } = require('../lib/queue');
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const s = new StockService(w, c);
+  const q = new OfflineQueue(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pos-')), 'q.json'));
+  w.products[1].failNext = true;
+  q.add('sold', [{ key: '1', qty: 1 }], 'Front');
+  q.add('sold', [{ key: '3', qty: 1 }], 'Front'); // gift card, stock not tracked
+  await q.flush(s, () => {});
+  assert.equal(q.count, 0);
+  assert.equal(q.problems.length, 2);
+  assert.match(q.problems[0].error, /boom/);
+  assert.equal(q.cancel(q.problems[0].id), true);
+  assert.equal(q.problems.length, 1);
+});
+
+test('catalog cache: the saved product list loads without the internet', async () => {
+  const w = fakeWoo();
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pos-')), 'cache.json');
+  await new Catalog(w, { cacheFile: file }).load();
+  const c = new Catalog({ getAll: async () => { throw new Error('offline'); } }, { cacheFile: file });
+  assert.equal(c.loadCache(), true);
+  assert.equal(c.fromCache, true);
+  assert.equal(c.items.length, 4);
+  assert.equal(c.search('tee-l')[0].sku, 'TEE-L');
+});
+
+test('low stock: tracked items at or below the limit, lowest first', async () => {
+  const w = fakeWoo();
+  w.products[1].stock_quantity = 1;
+  const c = new Catalog(w);
+  await c.load();
+  const low = c.lowStock({ max: 3 });
+  assert.deepEqual(low.map((i) => i.sku), ['BSI1', 'TEE-L']); // gift card is untracked
+  assert.deepEqual(c.lowStock({ max: 3, category: 'Decals' }).map((i) => i.sku), ['BSI1']);
+  assert.equal(c.lowStock({ max: 0 }).length, 0);
+  assert.ok(c.categoryNames().includes('Decals'));
+});
+
+test('price: regular and sale price saved on the website, bad prices refused', async () => {
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const p = new ProductService(w, c, null);
+  await p.updatePrice({ key: '1', regularPrice: '3.5', salePrice: '2.75' });
+  assert.equal(w.products[1].regular_price, '3.50');
+  assert.equal(w.products[1].sale_price, '2.75');
+  await p.updatePrice({ key: '1', regularPrice: '3.5', salePrice: '' });
+  assert.equal(w.products[1].sale_price, '');
+  await assert.rejects(p.updatePrice({ key: '1', regularPrice: '3', salePrice: '4' }), /lower than the regular/);
+  await assert.rejects(p.updatePrice({ key: '1', regularPrice: 'abc' }), /regular price/);
+});
+
+test('sales log: any day can be read back, with new products and undo marks', () => {
+  const { localDate } = require('../lib/saleslog');
+  const log = new SalesLog(fs.mkdtempSync(path.join(os.tmpdir(), 'pos-')));
+  const a = log.addSale('Front', [{ key: '1', qty: 1, price: '2' }], 'sold');
+  log.addSale('Front', [{ key: '1', qty: 4 }], 'received');
+  log.addNewProduct('Front', { key: '9', name: 'New thing', sku: 'N1', price: '5', stockQty: 2 });
+  log.addUndo(a.id, []);
+  const d = log.day(localDate());
+  assert.equal(d.length, 3);
+  assert.deepEqual(d.map((e) => (e.type === 'new' ? 'new' : e.mode)), ['new', 'received', 'sold']);
+  assert.equal(d.find((e) => e.id === a.id).undone, true);
+  assert.equal(log.day('2001-01-01').length, 0);
+  assert.equal(log.day('nonsense').length, 0);
+});
