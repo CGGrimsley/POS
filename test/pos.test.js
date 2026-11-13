@@ -8,6 +8,7 @@ const { Catalog, toItem, search } = require('../lib/catalog');
 const { StockService } = require('../lib/stock');
 const { SettingsStore, publicSettings } = require('../lib/settings');
 const { SalesLog } = require('../lib/saleslog');
+const { ProductService } = require('../lib/products');
 const { createPosServer } = require('../lib/app');
 
 // In-memory stand-in for the WooCommerce API.
@@ -31,12 +32,21 @@ function fakeWoo() {
   };
   return {
     products, variations, writes,
+    base: 'https://example.test/wp-json/wc/v3',
     async getAll(p) {
       if (p === '/products') return Object.values(products);
+      if (p === '/products/categories') return [{ id: 5, name: 'Optics', parent: 0 }, { id: 6, name: 'Thermal', parent: 5 }];
       const m = p.match(/^\/products\/(\d+)\/variations$/);
       return products[m[1]].variations.map((id) => variations[id]);
     },
     async get(p) { return { ...find(p) }; },
+    async post(p, body) {
+      if (p !== '/products') throw new Error('unexpected post ' + p);
+      const id = 100 + Object.keys(products).length;
+      products[id] = { id, type: 'simple', price: body.regular_price, images: [], categories: [], stock_status: 'instock', ...body };
+      writes.push([p, body]);
+      return { ...products[id] };
+    },
     async put(p, body) {
       const o = find(p);
       if (o.failNext) { o.failNext = false; throw new Error('boom'); }
@@ -170,4 +180,65 @@ test('server: API needs the launch token and a local Host header', async () => {
   } finally {
     server.close();
   }
+});
+
+test('received adds, set makes the count exact, and undo reverses each', async () => {
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const s = new StockService(w, c);
+  const r = await s.apply([{ key: '1', qty: 4 }], 'received');
+  assert.equal(w.products[1].stock_quantity, 14);
+  await s.undo({ mode: 'received', lines: r.done });
+  assert.equal(w.products[1].stock_quantity, 10);
+
+  const r2 = await s.apply([{ key: '2:22', qty: 0 }], 'set');
+  assert.equal(w.variations[22].stock_quantity, 0);
+  assert.equal(r2.done[0].before, 3);
+  await s.undo({ mode: 'set', lines: r2.done });
+  assert.equal(w.variations[22].stock_quantity, 3);
+  await assert.rejects(s.apply([{ key: '1', qty: 0 }], 'received'), /whole number from 1/);
+});
+
+test('receiving an untracked item turns tracking on; undo sets it back to 0', async () => {
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const s = new StockService(w, c);
+  const r = await s.apply([{ key: '3', qty: 2 }], 'received');
+  assert.equal(w.products[3].manage_stock, true);
+  assert.equal(w.products[3].stock_quantity, 2);
+  assert.equal(r.done[0].startedTracking, true);
+  assert.equal(c.get('3').manageStock, true);
+  await s.undo({ mode: 'received', lines: r.done });
+  assert.equal(w.products[3].stock_quantity, 0);
+});
+
+test('set count refuses two lines that share one parent stock number', async () => {
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  w.variations[22].manage_stock = 'parent';
+  await c.load();
+  await assert.rejects(new StockService(w, c).apply([{ key: '2:21', qty: 1 }, { key: '2:22', qty: 1 }], 'set'), /share one stock count/);
+});
+
+test('new product: created as draft with stock, added to search, duplicate SKU refused', async () => {
+  const w = fakeWoo();
+  const c = new Catalog(w);
+  await c.load();
+  const ps = new ProductService(w, c);
+  const cats = await ps.listCategories();
+  assert.deepEqual(cats.map((x) => x.name), ['Optics', 'Optics › Thermal']);
+  const out = await ps.create({ name: 'Peak Refuel Beef Stroganoff', price: '13.99', qty: 41, sku: 'PR-BS', categoryIds: [6] });
+  const sent = w.writes.at(-1)[1];
+  assert.equal(sent.status, 'draft');
+  assert.equal(sent.regular_price, '13.99');
+  assert.equal(sent.stock_quantity, 41);
+  assert.equal(sent.manage_stock, true);
+  assert.deepEqual(sent.categories, [{ id: 6 }]);
+  assert.equal(out.item.stockQty, 41);
+  assert.equal(c.search('stroganoff')[0].sku, 'PR-BS');
+  await assert.rejects(ps.create({ name: 'Other', price: 1, sku: 'pr-bs' }), /already uses SKU/);
+  await assert.rejects(ps.create({ name: 'Ok name', price: -1 }), /price/);
 });

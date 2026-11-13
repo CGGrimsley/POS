@@ -1,7 +1,7 @@
 {
   "name": "brushbeater-pos",
   "productName": "Brushbeater POS",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Counter app for the Brushbeater showroom: look up products and prices, and take sold items off brushbeater.store stock.",
   "author": "Brushbeater",
