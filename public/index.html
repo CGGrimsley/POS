@@ -12,6 +12,8 @@
     <div class="brand">Brushbeater <span>POS</span></div>
     <div id="catalog-status" class="muted"></div>
     <nav>
+      <button id="btn-new" class="ghost">New product</button>
+      <button id="btn-low" class="ghost">Low stock</button>
       <button id="btn-today" class="ghost">Today</button>
       <button id="btn-refresh" class="ghost" title="Reload products, prices and stock from the website">Refresh products</button>
       <button id="btn-settings" class="ghost">Settings</button>
@@ -29,11 +31,15 @@
 
     <aside class="cart">
       <div class="cart-head">
-        <h2>Sold</h2>
+        <div id="modes" class="modes" role="group" aria-label="What are you recording?">
+          <button data-mode="sold">Sold</button>
+          <button data-mode="received">Received</button>
+          <button data-mode="set">Set count</button>
+        </div>
         <button id="btn-clear" class="ghost small">Clear</button>
       </div>
       <div id="cart-lines" class="cart-lines"></div>
-      <div class="totals">
+      <div id="totals" class="totals">
         <div><span>Subtotal</span><span id="t-sub">$0.00</span></div>
         <div><span id="t-tax-label">Sales tax</span><span id="t-tax">$0.00</span></div>
         <div class="grand"><span>Total</span><span id="t-total">$0.00</span></div>
@@ -44,7 +50,7 @@
   </main>
 
   <dialog id="dlg-confirm">
-    <h2>Take these off website stock?</h2>
+    <h2 id="confirm-title">Take these off website stock?</h2>
     <div id="confirm-body"></div>
     <div id="confirm-error" class="error" hidden></div>
     <div class="row-end">
@@ -53,10 +59,83 @@
     </div>
   </dialog>
 
+
+  <dialog id="dlg-product" class="wide">
+    <h2>New product</h2>
+    <form id="product-form">
+      <fieldset>
+        <label>Name <input name="name" required maxlength="200" autocomplete="off"></label>
+        <div class="two">
+          <label>Price <input name="price" type="number" min="0" step="0.01" required inputmode="decimal"></label>
+          <label>Quantity on hand <input name="qty" type="number" min="0" max="9999" step="1" value="1"></label>
+        </div>
+        <label>SKU or barcode (optional, you can scan it) <input name="sku" maxlength="100" autocomplete="off"></label>
+        <label>Category <select name="category"><option value="">Loading...</option></select></label>
+        <label>Short description (optional) <textarea name="description" rows="2" maxlength="2000"></textarea></label>
+        <div class="photos">
+          <span class="lbl">Photos (optional, up to 6, the first is the main photo)</span>
+          <div id="photo-list" class="photo-list"></div>
+          <div class="photo-actions">
+            <label class="filebtn">Add photos<input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
+            <input name="imageUrl" type="url" placeholder="or paste a photo link (https://...)" autocomplete="off">
+          </div>
+          <p id="photo-hint" class="muted small" hidden>Photo uploads need a WordPress login in Settings. A pasted link works without it.</p>
+        </div>
+        <label class="check"><input type="checkbox" name="publish"> Show it on the website now</label>
+        <p class="muted small">Left unchecked, it is saved as a draft: hidden online, but you can still sell it here. Check the full description in WordPress before publishing.</p>
+      </fieldset>
+      <div id="product-msg" class="error" hidden></div>
+      <div class="row-end">
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Add product</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="dlg-today" class="wide">
-    <h2>Today on this laptop</h2>
+    <div class="dlg-head">
+      <h2 id="today-title">Today</h2>
+      <div class="dlg-tools">
+        <input id="day-pick" type="date" aria-label="Day">
+        <button id="day-csv" class="small">Export CSV</button>
+      </div>
+    </div>
     <div id="today-body"></div>
     <div class="row-end"><button class="ghost" data-close>Close</button></div>
+  </dialog>
+
+  <dialog id="dlg-price">
+    <h2>Change price</h2>
+    <p id="price-name" class="muted"></p>
+    <form id="price-form">
+      <div class="two">
+        <label>Regular price <input name="regular" type="number" min="0" step="0.01" required inputmode="decimal"></label>
+        <label>Sale price (blank for none) <input name="sale" type="number" min="0" step="0.01" inputmode="decimal"></label>
+      </div>
+      <p class="muted small">This changes the price on the website right away.</p>
+      <div id="price-msg" class="error" hidden></div>
+      <div class="row-end">
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Save price</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-low" class="wide">
+    <div class="dlg-head">
+      <h2>Low stock</h2>
+      <div class="dlg-tools no-print">
+        <label class="inline">At or below <input id="low-max" type="number" min="0" max="9999" value="2"></label>
+        <select id="low-cat" aria-label="Category"><option value="">All categories</option></select>
+        <label class="inline check"><input id="low-hidden" type="checkbox"> Include hidden</label>
+      </div>
+    </div>
+    <div id="low-body" class="low-body"></div>
+    <div class="row-end no-print">
+      <button id="low-print" class="ghost">Print</button>
+      <button id="low-csv" class="ghost">Export CSV</button>
+      <button class="primary" data-close>Close</button>
+    </div>
   </dialog>
 
   <dialog id="dlg-settings" class="wide">
@@ -75,6 +154,16 @@
         <label>Sales tax rate for the on-screen total, as a decimal <input name="taxRate" inputmode="decimal"></label>
         <p class="muted small">Yanceyville is 0.0675 (4.75% NC plus 2% Caswell County). Use 0 to hide tax.</p>
       </fieldset>
+      <fieldset>
+        <legend>Photo uploads for new products (optional)</legend>
+        <label>WordPress username <input name="wpUser" autocomplete="off"></label>
+        <label>Application Password <input name="wpAppPassword" type="password" autocomplete="off" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"></label>
+        <p class="muted small">In WordPress go to Users, Profile, Application Passwords, type a name like "POS laptop 1" and click Add. Paste the password it shows here. This is not your normal login password. It is stored encrypted on this laptop only.</p>
+      </fieldset>
+      <div class="row-between">
+        <span id="app-version" class="muted small"></span>
+        <button type="button" id="btn-update" class="small ghost" hidden>Check for updates</button>
+      </div>
       <div id="settings-msg" class="error" hidden></div>
       <div class="row-end">
         <button type="button" class="ghost" data-close>Close</button>
